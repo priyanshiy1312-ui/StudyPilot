@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StudyPilot — simulated Alexa+</title>
+<style>:root{--bg:#0f1b2d;--c:#16263d;--ink:#e8f0fa;--ac:#31c4f3}body{margin:0;font:16px system-ui;background:var(--bg);color:var(--ink)}main{max-width:720px;margin:auto;padding:20px}
+h1{color:var(--ac);margin:0}.n{color:#9db2c9;font-size:13px}#log{min-height:280px;background:var(--c);border-radius:14px;padding:14px;margin:14px 0;overflow:auto;max-height:55vh}
+.u{text-align:right;margin:8px 0}.a{margin:8px 0}.t{display:inline-block;font:12px monospace;background:#0b1523;color:var(--ac);padding:3px 8px;border-radius:8px;margin-bottom:4px}
+.row{display:flex;gap:8px}input{flex:1;padding:12px;border-radius:10px;border:1px solid #2b4263;background:var(--c);color:var(--ink)}button{padding:10px 14px;border:0;border-radius:10px;background:var(--ac);color:#06202b;font-weight:600;cursor:pointer}
+.ex button{background:transparent;color:var(--ac);border:1px solid var(--ac);margin:4px 4px 0 0;font-weight:400}</style></head><body><main>
+<h1>StudyPilot</h1><div class="n">Simulated Alexa+ client · talks to the MCP server over Streamable HTTP · rule-based routing (not real Alexa+ NLU)</div>
+<div id="log" role="log" aria-live="polite"></div>
+<form class="row" id="f"><input id="i" aria-label="Say something" placeholder="Type or press 🎤 and speak" autocomplete="off"><button type="button" id="mic" aria-label="Speak">🎤</button><button>Send</button></form>
+<div class="ex" id="ex"></div><label class="n"><input type="checkbox" id="tts" checked style="flex:none"> Speak replies</label></main>
+<script>
+const log=document.getElementById('log'),i=document.getElementById('i');
+const ex=['add deadline DBMS assignment due friday','what\'s due','plan 90 minutes of DBMS','flashcard what is a test oracle answer a mechanism to decide pass or fail','quiz me','my answer is a mechanism to decide pass or fail'];
+document.getElementById('ex').innerHTML=ex.map(e=>`<button type="button">${e}</button>`).join('');
+document.getElementById('ex').onclick=e=>{if(e.target.tagName==='BUTTON')send(e.target.textContent)};
+const add=(c,h)=>{const d=document.createElement('div');d.className=c;d.innerHTML=h;log.append(d);log.scrollTop=log.scrollHeight};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function send(text){if(!text.trim())return;add('u',esc(text));i.value='';
+ try{const r=await(await fetch('/simulate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text})})).json();
+ add('a',(r.tool?`<span class="t">MCP tool: ${r.tool}(${esc(JSON.stringify(r.args))})</span><br>`:'')+esc(r.reply));
+ if(document.getElementById('tts').checked&&'speechSynthesis'in window)speechSynthesis.speak(new SpeechSynthesisUtterance(r.reply))}
+ catch{add('a','Network error.')}}
+document.getElementById('f').onsubmit=e=>{e.preventDefault();send(i.value)};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+document.getElementById('mic').onclick=()=>{if(!SR)return add('a','Speech recognition not supported in this browser (try Chrome).');const r=new SR();r.lang='en-IN';r.onresult=e=>send(e.results[0][0].transcript);r.start()};
+</script></body></html>

@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+process.env.MCP_TOKEN = 'test';
+const { createApp } = await import('../src/server.js');
+const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+const srv = createApp().listen(0); const port = srv.address().port, base = `http://127.0.0.1:${port}`;
+const mk = async (token = 'test') => { const c = new Client({ name: 't', version: '1' });
+  await c.connect(new StreamableHTTPClientTransport(new URL(base + '/mcp'), { requestInit: { headers: { Authorization: `Bearer ${token}`, 'x-user-id': 'test-' + Date.now() } } })); return c; };
+let n = 0; const t = async (name, f) => { try { await f(); console.log('PASS', name); n++; } catch (e) { console.log('FAIL', name, e.message); process.exitCode = 1; } };
+const c = await mk(); const call = async (name, args) => (await c.callTool({ name, arguments: args }));
+const txt = r => r.content[0].text;
+await t('lists 5 tools', async () => assert.equal((await c.listTools()).tools.length, 5));
+await t('add_deadline ok', async () => assert.match(txt(await call('add_deadline', { title: 'DBMS assignment', due: 'tomorrow' })), /due tomorrow/));
+await t('add_deadline bad date → isError', async () => { const r = await call('add_deadline', { title: 'x', due: 'someday' }); assert.ok(r.isError); });
+await t('invalid input rejected', async () => { const r = await call('plan_study_session', { minutes: 5 }).catch(e => ({ isError: true })); assert.ok(r.isError); });
+await t('whats_due', async () => assert.match(txt(await call('whats_due', {})), /DBMS assignment/));
+await t('plan_study_session 90', async () => assert.match(txt(await call('plan_study_session', { minutes: 90 })), /3 focus blocks/));
+await t('flashcard + quiz right/wrong', async () => {
+  await call('add_flashcard', { question: 'What does SEPM stand for', answer: 'Software Engineering and Project Management' });
+  assert.match(txt(await call('quiz_me', {})), /Question: What does SEPM/);
+  assert.match(txt(await call('quiz_me', { answer: 'software engineering and project management' })), /Correct/);
+  await call('quiz_me', {}); assert.match(txt(await call('quiz_me', { answer: 'banana' })), /Not quite/);
+});
+await t('quiz answer w/o question → isError', async () => assert.ok((await call('quiz_me', { answer: 'x' })).isError));
+await t('rejects missing token (401)', async () => assert.equal((await fetch(base + '/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401));
+await t('GET /mcp → 405', async () => assert.equal((await fetch(base + '/mcp', { headers: { Authorization: 'Bearer test' } })).status, 405));
+await t('/simulate end-to-end', async () => { const r = await (await fetch(base + '/simulate', { method: 'POST', headers: { 'content-type': 'application/json', 'x-user-id': 'sim' + Date.now() }, body: JSON.stringify({ text: 'add deadline physics lab due friday' }) })).json(); assert.equal(r.tool, 'add_deadline'); assert.match(r.reply, /Got it/); });
+console.log(`${n} passed`); await c.close(); srv.close();

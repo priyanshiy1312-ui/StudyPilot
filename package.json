@@ -1,0 +1,1 @@
+{"name":"studypilot-alexa-mcp","version":"1.0.0","type":"module","private":true,"scripts":{"start":"node src/server.js","test":"node test/run.mjs"},"engines":{"node":">=18"},"dependencies":{"@modelcontextprotocol/sdk":"^1.32.0","dotenv":"^18.0.5","express":"^5.2.1","zod":"^4.6.5"}}
